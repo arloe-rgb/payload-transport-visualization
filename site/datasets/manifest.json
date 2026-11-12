@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "datasets": [
+    {
+      "id": "circular-baseline",
+      "name": "Circular tracking baseline",
+      "file": "datasets/circular-baseline.json",
+      "duration": 20.0,
+      "metadata": {
+        "uavs": 4,
+        "samples": 2001,
+        "replayVersion": 1
+      },
+      "description": "20-second planar tracking run with four UAVs and 10 ms samples."
+    }
+  ],
+  "default": "circular-baseline"
+}
