@@ -11,7 +11,40 @@
         "samples": 1501,
         "replayVersion": 1
       }
+    },
+    {
+      "id": "sin-traj-sin-orient",
+      "name": "sinusoidal trajectory sinusoidal orientation",
+      "file": "datasets/sin-traj-sin-orient.json",
+      "duration": 15.0,
+      "metadata": {
+        "uavs": 4,
+        "samples": 1501,
+        "replayVersion": 1
+      }
+    },
+    {
+      "id": "circular-constant-orientation",
+      "name": "Circular Position - Constant Orientation",
+      "file": "datasets/circular-constant-orientation.json",
+      "duration": 15.0,
+      "metadata": {
+        "uavs": 4,
+        "samples": 1501,
+        "replayVersion": 1
+      }
+    },
+    {
+      "id": "sinusoidal-constant-orientation",
+      "name": "Sinusoidal Position - Constant Orientation",
+      "file": "datasets/sinusoidal-constant-orientation.json",
+      "duration": 15.0,
+      "metadata": {
+        "uavs": 4,
+        "samples": 1501,
+        "replayVersion": 1
+      }
     }
   ],
-  "default": "circ-traj-sin-orient"
+  "default": "circular-constant-orientation"
 }
