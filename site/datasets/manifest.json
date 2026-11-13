@@ -23,6 +23,17 @@
         "samples": 2001,
         "replayVersion": 1
       }
+    },
+    {
+      "id": "sinusoidal-amp-2",
+      "name": "Sinusoidal Amplitude 2",
+      "file": "datasets/sinusoidal-amp-2.json",
+      "duration": 20.0,
+      "metadata": {
+        "uavs": 4,
+        "samples": 2001,
+        "replayVersion": 1
+      }
     }
   ],
   "default": "circular-baseline"
