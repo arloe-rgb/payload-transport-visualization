@@ -34,6 +34,17 @@
         "samples": 2001,
         "replayVersion": 1
       }
+    },
+    {
+      "id": "sin-orient",
+      "name": "sinusoidal orientation",
+      "file": "datasets/sin-orient.json",
+      "duration": 20.0,
+      "metadata": {
+        "uavs": 4,
+        "samples": 2001,
+        "replayVersion": 1
+      }
     }
   ],
   "default": "circular-baseline"
