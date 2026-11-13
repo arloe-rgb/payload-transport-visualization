@@ -2,6 +2,8 @@
 const PAYLOAD_DEPTH = 0.8; // m, visual only
 const MIN_DIRECTION_FORCE = 0.025; // N, visual only
 const UAV_COLORS = [0x008477, 0xc66b29, 0x616bc4, 0xb34e8a, 0x6f8b25, 0x197eac];
+const ACTUAL_PATH = {color: 0x38ddf3, width: 3.5};
+const REFERENCE_PATH = {color: 0xffad55, width: 7.5, dash: 0.24, gap: 0.16};
 
 class ReplayScene {
   constructor(canvas) {
@@ -11,7 +13,7 @@ class ReplayScene {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = ThreeReplay.PCFShadowMap;
     this.scene = new ThreeReplay.Scene();
-    this.scene.background = new ThreeReplay.Color(0xe9eff1);
+    this.scene.background = new ThreeReplay.Color(0x222c38);
     this.scene.add(new ThreeReplay.HemisphereLight(0xf6fbff, 0x718189, 2.15));
     this.sun = new ThreeReplay.DirectionalLight(0xfff6e9, 2.4);
     this.sun.castShadow = true;
@@ -77,40 +79,48 @@ class ReplayScene {
     this.world.clear();
     this.replay = replay;
     const {width, height, attachments} = replay.payload;
-    const solid = new ThreeReplay.MeshStandardMaterial({color: 0x245563, roughness: 0.62});
-    const trim = new ThreeReplay.MeshStandardMaterial({color: 0x678d98, roughness: 0.43, metalness: 0.24});
+    const solid = new ThreeReplay.MeshStandardMaterial({color: 0xa283c1, roughness: 0.62});
+    const trim = new ThreeReplay.MeshStandardMaterial({color: 0xc2afd9, roughness: 0.43, metalness: 0.24});
     const box = new ThreeReplay.BoxGeometry(width, PAYLOAD_DEPTH, height);
     this.payload = new ThreeReplay.Group();
     this.world.add(this.payload);
-    this.mesh(box, solid, this.payload);
+    this.mesh(box, solid, this.payload).renderOrder = 1;
     for (const x of [-width * 0.37, width * 0.37]) {
-      this.mesh(new ThreeReplay.BoxGeometry(width * 0.055, PAYLOAD_DEPTH + 0.025, height + 0.025), trim, this.payload, x);
+      this.mesh(new ThreeReplay.BoxGeometry(width * 0.055, PAYLOAD_DEPTH + 0.025, height + 0.025), trim, this.payload, x).renderOrder = 2;
     }
+    const edges = new ThreeReplay.LineSegments(new ThreeReplay.EdgesGeometry(box),
+      new ThreeReplay.LineBasicMaterial({color: 0xe6d9f3, transparent: true, depthWrite: false}));
+    edges.renderOrder = 3;
+    this.payload.add(edges);
+    this.payloadMaterials = {solid, trim, edges: edges.material};
+
     const marker = new ThreeReplay.SphereGeometry(Math.min(width, height) * 0.047, 16, 10);
-    const centerMaterial = new ThreeReplay.MeshBasicMaterial({color: 0xfff1bd, depthTest: false});
+    // Keep the payload markers readable above the transparent surfaces.
+    const markerOptions = {transparent: true, depthTest: false, depthWrite: false};
+    const centerMaterial = new ThreeReplay.MeshBasicMaterial({color: 0xfff1bd, ...markerOptions});
     const com = this.mesh(marker, centerMaterial, this.payload);
     com.castShadow = false;
-    com.renderOrder = 3;
+    com.renderOrder = 4;
     const centerRing = this.mesh(new ThreeReplay.RingGeometry(height * 0.07, height * 0.085, 28),
-      new ThreeReplay.MeshBasicMaterial({color: 0xfff1bd, side: ThreeReplay.DoubleSide, depthTest: false}),
+      new ThreeReplay.MeshBasicMaterial({color: 0xfff1bd, side: ThreeReplay.DoubleSide, ...markerOptions}),
       this.payload);
     centerRing.rotation.x = Math.PI / 2;
     centerRing.castShadow = false;
-    centerRing.renderOrder = 3;
+    centerRing.renderOrder = 4;
 
     this.ghost = new ThreeReplay.Mesh(box, new ThreeReplay.MeshBasicMaterial({
       color: 0xf3ac49, opacity: 0.14, transparent: true, depthWrite: false,
     }));
     this.ghost.add(new ThreeReplay.LineSegments(new ThreeReplay.EdgesGeometry(box),
-      new ThreeReplay.LineBasicMaterial({color: 0xd98927, transparent: true, opacity: 0.7})));
+      new ThreeReplay.LineBasicMaterial({color: 0xd98927, transparent: true, opacity: 0.7, depthWrite: false})));
     this.world.add(this.ghost);
 
     this.drones = attachments.map(([x, z], i) => {
       const tint = UAV_COLORS[i % UAV_COLORS.length];
-      const markerMaterial = new ThreeReplay.MeshBasicMaterial({color: tint, depthTest: false});
+      const markerMaterial = new ThreeReplay.MeshBasicMaterial({color: tint, ...markerOptions});
       const attachment = this.mesh(marker, markerMaterial, this.payload, x, 0, z);
       attachment.castShadow = false;
-      attachment.renderOrder = 3;
+      attachment.renderOrder = 4;
       return this.quadrotor(tint, i);
     });
 
@@ -138,11 +148,17 @@ class ReplayScene {
     bounds.getCenter(this.center);
     this.span = Math.max(bounds.max.x - bounds.min.x, bounds.max.z - bounds.min.z, 4);
     this.makeEnvironment(bounds.min.z - 0.32);
-    this.actual = this.path(replay.state, 0x0a877b);
-    this.reference = this.path(replay.reference, 0xd98927, true);
-    this.trailTip = this.path([[0, 0], [0, 0]], 0x0a877b);
-    this.trailTip.geometry.attributes.position.setUsage(ThreeReplay.DynamicDrawUsage);
-    this.trailTip.frustumCulled = false;
+    this.actual = new TrajectoryLine(replay.state, ACTUAL_PATH);
+    this.reference = new TrajectoryLine(replay.reference, REFERENCE_PATH);
+    this.trailTip = new TrajectoryLine([[0, 0], [0, 0]], ACTUAL_PATH);
+    const tipAttributes = this.trailTip.geometry.attributes;
+    tipAttributes.segmentStart.setUsage(ThreeReplay.DynamicDrawUsage);
+    tipAttributes.segmentEnd.setUsage(ThreeReplay.DynamicDrawUsage);
+    this.actual.geometry.instanceCount = this.trailTip.geometry.instanceCount = 0;
+    // Draw cyan over the middle of the wider orange dashes at exact overlaps.
+    this.reference.renderOrder = 1;
+    this.actual.renderOrder = this.trailTip.renderOrder = 2;
+    this.world.add(this.reference, this.actual, this.trailTip);
     this.setView(this.view);
   }
 
@@ -204,10 +220,10 @@ class ReplayScene {
   makeEnvironment(groundZ) {
     const size = Math.ceil(Math.max(18, this.span * 2.7) / 2) * 2;
     const floor = this.mesh(new ThreeReplay.PlaneGeometry(size, size),
-      new ThreeReplay.MeshStandardMaterial({color: 0xe3ebed, roughness: 1}),
+      new ThreeReplay.MeshStandardMaterial({color: 0x293340, roughness: 1}),
       this.world, this.center.x, 0, groundZ);
     floor.castShadow = false;
-    const grid = new ThreeReplay.GridHelper(size, size, 0x94a7b0, 0xbccbd1);
+    const grid = new ThreeReplay.GridHelper(size, size, 0x526171, 0x414e5e);
     grid.rotation.x = Math.PI / 2;
     grid.position.set(this.center.x, 0, groundZ + 0.005);
     this.world.add(grid);
@@ -232,17 +248,19 @@ class ReplayScene {
     this.sun.shadow.camera.updateProjectionMatrix();
   }
 
-  path(states, color, dashed = false) {
-    const positions = new Float32Array(states.length * 3);
-    states.forEach(([x, z], i) => { positions[3 * i] = x; positions[3 * i + 2] = z; });
-    const geometry = new ThreeReplay.BufferGeometry().setAttribute("position", new ThreeReplay.BufferAttribute(positions, 3));
-    const material = dashed
-      ? new ThreeReplay.LineDashedMaterial({color, dashSize: 0.14, gapSize: 0.10})
-      : new ThreeReplay.LineBasicMaterial({color});
-    const line = new ThreeReplay.Line(geometry, material);
-    if (dashed) line.computeLineDistances();
-    this.world.add(line);
-    return line;
+  setPayloadOpacity(opacity) {
+    const {solid, trim, edges} = this.payloadMaterials;
+    if (solid.opacity === opacity) return;
+    solid.opacity = opacity;
+    trim.opacity = edges.opacity = opacity + (1 - opacity) * 0.25;
+    const transparent = opacity < 1;
+    for (const material of [solid, trim]) {
+      if (material.transparent !== transparent) {
+        material.transparent = transparent;
+        material.depthWrite = !transparent;
+        material.needsUpdate = true;
+      }
+    }
   }
 
   setView(view) {
@@ -286,6 +304,7 @@ class ReplayScene {
     if (!width || !height) return;
     this.renderer.setSize(width, height, false);
     if (!this.camera) return;
+    for (const path of [this.reference, this.actual, this.trailTip]) path.setResolution(width, height);
     const aspect = width / height;
     if (this.camera.isPerspectiveCamera) {
       this.camera.aspect = aspect;
@@ -298,20 +317,18 @@ class ReplayScene {
     this.render();
   }
 
-  update({pose, reference, forces, index, fraction, time, visible, cableLength, arrowScale}) {
+  update({pose, reference, forces, index, fraction, time, visible, cableLength, arrowScale, payloadOpacity}) {
     const [x, z, theta] = pose;
     this.payload.position.set(x, 0, z);
     this.payload.rotation.y = -theta;
+    this.setPayloadOpacity(payloadOpacity);
     this.ghost.position.set(reference[0], 0, reference[1]);
     this.ghost.rotation.y = -reference[2];
     this.ghost.visible = this.reference.visible = visible.reference;
     this.actual.visible = this.trailTip.visible = visible.actual;
-    this.actual.geometry.setDrawRange(0, index + 1);
+    this.actual.geometry.instanceCount = index;
     const [sampleX, sampleZ] = this.replay.state[index];
-    const tip = this.trailTip.geometry.attributes.position;
-    tip.setXYZ(0, sampleX, 0, sampleZ);
-    tip.setXYZ(1, x, 0, z);
-    tip.needsUpdate = true;
+    this.trailTip.setTip(sampleX, sampleZ, x, z);
 
     const cos = Math.cos(theta), sin = Math.sin(theta);
     const direction = this.scratch;

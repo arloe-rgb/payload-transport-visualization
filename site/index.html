@@ -6,6 +6,7 @@
   <title>Payload Transport Lab</title>
   <link rel="stylesheet" href="style.css">
   <script defer src="vendor/three-replay.min.js"></script>
+  <script defer src="trajectory.js"></script>
   <script defer src="scene.js"></script>
   <script defer src="player.js"></script>
 </head>
@@ -23,11 +24,16 @@
       <section class="viewport" aria-labelledby="scene-title">
         <div class="bar"><h2 id="scene-title">3D view</h2><span id="run-info" role="status">Loading replay…</span></div>
         <div class="stage">
-          <canvas id="scene" role="img" aria-label="3D replay of the planar payload, UAVs, and cables"></canvas>
-          <p id="empty" hidden></p>
-          <p id="scene-error" hidden>WebGL 2 is unavailable. Playback and research charts are still available.</p>
-          <div class="key"><span class="actual">Actual</span><span class="reference">Reference</span></div>
-          <canvas id="camera-axes" width="156" height="156" aria-hidden="true"></canvas>
+          <ul class="key" aria-label="Trajectory legend">
+            <li class="actual">Actual trajectory</li>
+            <li class="reference">Reference trajectory</li>
+          </ul>
+          <div class="scene-frame">
+            <canvas id="scene" role="img" aria-label="3D replay of the planar payload, UAVs, and cables"></canvas>
+            <p id="empty" hidden></p>
+            <p id="scene-error" hidden>WebGL 2 is unavailable. Playback and research charts are still available.</p>
+            <canvas id="camera-axes" width="156" height="156" aria-hidden="true"></canvas>
+          </div>
         </div>
         <fieldset id="camera-controls" class="camera-controls">
           <legend class="sr-only">Camera controls</legend>
@@ -57,12 +63,20 @@
             </select></label>
           </div>
         </fieldset>
+        <div id="orientation-chart"></div>
       </section>
       <aside class="layers" aria-labelledby="layers-title">
         <h2 id="layers-title">Scene layers</h2>
-        <div id="toggles">
-          <label><input id="show-reference" type="checkbox" checked> Reference trajectory</label>
+        <div class="appearance">
+          <div class="opacity-setting">
+            <label for="payload-opacity">Payload opacity</label>
+            <output id="opacity-value" for="payload-opacity" aria-hidden="true">65%</output>
+            <input id="payload-opacity" type="range" min="20" max="100" value="65" aria-valuetext="65%">
+          </div>
           <label><input id="show-actual" type="checkbox" checked> Actual trajectory</label>
+          <label><input id="show-reference" type="checkbox" checked> Reference trajectory</label>
+        </div>
+        <div id="toggles">
           <label><input id="show-forces" type="checkbox" checked> Force vectors</label>
           <label><input id="show-cables" type="checkbox" checked> Cables</label>
           <label><input id="show-labels" type="checkbox" checked> UAV labels</label>

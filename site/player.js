@@ -4,6 +4,7 @@ const color = (index) => palette[index % palette.length];
 const scene = byId("scene");
 const timeline = byId("timeline");
 const chartRoot = byId("charts");
+const opacitySlider = byId("payload-opacity");
 let data, time, index, playing = false, lastFrame, frameRequest;
 let charts = [];
 let scene3D;
@@ -109,6 +110,7 @@ function drawScene() {
     pose, index, fraction, time, visible,
     reference: interpolate(data.reference), forces: interpolate(data.u),
     cableLength: setting("cable-length", 1.6), arrowScale: setting("force-scale", 0.18),
+    payloadOpacity: opacitySlider.valueAsNumber / 100,
   });
 }
 
@@ -156,9 +158,9 @@ function renderChart(chart) {
     ctx.textAlign = tick === 4 ? "right" : tick === 0 ? "left" : "center";
     ctx.fillText(`${Number(t.toFixed(2))} s`, x, bottom + 16);
   }
-  for (const {values, tint, dashed} of chart.series) {
+  for (const {values, tint, dashed, strokeWidth = 1.65} of chart.series) {
     ctx.strokeStyle = tint;
-    ctx.lineWidth = 1.65;
+    ctx.lineWidth = strokeWidth;
     ctx.setLineDash(dashed ? [5, 4] : []);
     ctx.beginPath();
     values.forEach((value, i) => {
@@ -179,15 +181,52 @@ const chartObserver = new ResizeObserver((entries) => {
   }
 });
 
+function addChart(parent, label, traces, headingTag = "h3") {
+  const card = document.createElement("article");
+  card.className = "chart";
+  card.innerHTML = "<div class='chart-area'><canvas role='img'></canvas><span class='cursor'></span></div><div class='chart-key'></div>";
+  const heading = document.createElement(headingTag);
+  heading.textContent = label;
+  card.prepend(heading);
+  const canvas = card.querySelector("canvas");
+  canvas.setAttribute("aria-label", `${label} over simulation time`);
+  const chart = {canvas, cursor: card.querySelector(".cursor"), series: traces};
+  const legend = card.querySelector(".chart-key");
+  for (const trace of traces) {
+    const key = document.createElement("span");
+    const swatch = document.createElement("i");
+    swatch.style.color = trace.tint;
+    swatch.style.borderTopStyle = trace.dashed ? "dashed" : "solid";
+    key.append(swatch, trace.label);
+    legend.append(key);
+  }
+  canvas.addEventListener("click", (event) => {
+    if (!chart.width) return;
+    const fraction = (event.clientX - canvas.getBoundingClientRect().left - chart.left) / chart.width;
+    pause();
+    seek(data.time[0] + fraction * (data.time.at(-1) - data.time[0]));
+  });
+  parent.append(card);
+  charts.push(chart);
+  chartObserver.observe(canvas);
+}
+
 function buildCharts() {
   chartObserver.disconnect();
+  const orientationRoot = byId("orientation-chart");
+  orientationRoot.replaceChildren();
   chartRoot.replaceChildren();
   charts = [];
   const component = (rows, i) => rows.map((row) => row[i]);
   const series = (label, values, tint, dashed = false) => ({label, values, tint, dashed});
+  // A wider reference trace stays visible at the edges when the angles coincide.
+  addChart(orientationRoot, "Payload orientation (rad)", [
+    {...series("Reference θ", component(data.reference, 2), "#c76b24", true), strokeWidth: 5},
+    {...series("Actual θ", component(data.state, 2), "#007c8f"), strokeWidth: 2},
+  ], "h2");
   const perUav = (makeSeries) => data.forceLimits.map((limit, i) => makeSeries(i, limit)).flat();
   const forces = (axis) => perUav((i) => series(`UAV ${i + 1}`, component(data.u, 2 * i + axis), color(i)));
-  const track = ["x (m)", "z (m)", "θ (rad)"].map((label, i) => [label, [
+  const track = ["x (m)", "z (m)"].map((label, i) => [label, [
     series("Actual", component(data.state, i), palette[0]),
     series("Reference", component(data.reference, i), palette[1], true),
   ]]);
@@ -221,30 +260,7 @@ function buildCharts() {
     group.firstChild.textContent = name;
     chartRoot.append(group);
     for (const [label, traces] of plots) {
-      const card = document.createElement("article");
-      card.className = "chart";
-      card.innerHTML = "<h3></h3><div class='chart-area'><canvas role='img'></canvas><span class='cursor'></span></div><div class='chart-key'></div>";
-      card.firstChild.textContent = label;
-      const canvas = card.querySelector("canvas");
-      canvas.setAttribute("aria-label", `${label} over simulation time`);
-      const chart = {canvas, cursor: card.querySelector(".cursor"), series: traces};
-      for (const trace of traces) {
-        const key = document.createElement("span");
-        const swatch = document.createElement("i");
-        swatch.style.color = trace.tint;
-        swatch.style.borderTopStyle = trace.dashed ? "dashed" : "solid";
-        key.append(swatch, trace.label);
-        card.querySelector(".chart-key").append(key);
-      }
-      canvas.addEventListener("click", (event) => {
-        if (!chart.width) return;
-        const fraction = (event.clientX - canvas.getBoundingClientRect().left - chart.left) / chart.width;
-        pause();
-        seek(data.time[0] + fraction * (data.time.at(-1) - data.time[0]));
-      });
-      group.lastChild.append(card);
-      charts.push(chart);
-      chartObserver.observe(canvas);
+      addChart(group.lastChild, label, traces);
     }
   }
 }
@@ -280,6 +296,13 @@ for (const [id, delta] of [["back", -1], ["forward", 1]]) {
   });
 }
 document.querySelectorAll(".layers input").forEach((input) => input.addEventListener("input", drawScene));
+function updateOpacityLabel() {
+  const percent = `${opacitySlider.value}%`;
+  byId("opacity-value").value = percent;
+  opacitySlider.setAttribute("aria-valuetext", percent);
+}
+opacitySlider.addEventListener("input", updateOpacityLabel);
+updateOpacityLabel();
 try {
   scene3D = new ReplayScene(scene);
 } catch (error) {
