@@ -44,6 +44,15 @@ function validate(replay) {
       throw new Error(`Invalid or missing replay history: ${key}.`);
     }
   }
+  for (const key of ["uav_positions", "attachment_positions"]) {
+    const rows = replay[key];
+    if (rows === undefined) continue;
+    if (!Array.isArray(rows) || rows.length !== samples.length ||
+        !rows.every((row) => Array.isArray(row) && row.length === count &&
+          row.every((point) => vector(point, 2)))) {
+      throw new Error(`Invalid replay history: ${key}. Expected one [x, z] pair per UAV at each timestamp.`);
+    }
+  }
 }
 
 function locate(t) {
@@ -57,11 +66,9 @@ function locate(t) {
   return lo;
 }
 
-function interpolate(rows) {
-  const next = Math.min(index + 1, rows.length - 1);
-  if (next === index) return rows[index];
-  const fraction = (time - data.time[index]) / (data.time[next] - data.time[index]);
-  return rows[index].map((value, j) => value + fraction * (rows[next][j] - value));
+function interpolate(row, nextRow, fraction) {
+  if (fraction === 0) return row;
+  return row.map((value, j) => value + fraction * (nextRow[j] - value));
 }
 
 function seek(t) {
@@ -91,7 +98,12 @@ function frame(now) {
 
 function drawScene() {
   if (!data) return;
-  const pose = interpolate(data.state);
+  const next = Math.min(index + 1, data.time.length - 1);
+  const fraction = next === index ? 0 : (time - data.time[index]) / (data.time[next] - data.time[index]);
+  const sample = (rows) => interpolate(rows[index], rows[next], fraction);
+  const samplePositions = (rows) => rows?.[index].map((point, i) =>
+    interpolate(point, rows[next][i], fraction));
+  const pose = sample(data.state);
   const [x, z, theta] = pose;
   byId("pose-x").textContent = `${x.toFixed(2)} m`;
   byId("pose-z").textContent = `${z.toFixed(2)} m`;
@@ -102,13 +114,13 @@ function drawScene() {
     const input = byId(id);
     return input.validity.valid && input.valueAsNumber > 0 ? input.valueAsNumber : fallback;
   };
-  const next = Math.min(index + 1, data.time.length - 1);
-  const fraction = next === index ? 0 : (time - data.time[index]) / (data.time[next] - data.time[index]);
   const visible = Object.fromEntries(["reference", "actual", "forces", "cables", "labels"].map((layer) =>
     [layer, byId(`show-${layer}`).checked]));
   scene3D.update({
     pose, index, fraction, time, visible,
-    reference: interpolate(data.reference), forces: interpolate(data.u),
+    reference: sample(data.reference), forces: sample(data.u),
+    uavPositions: samplePositions(data.uav_positions),
+    attachmentPositions: samplePositions(data.attachment_positions),
     cableLength: setting("cable-length", 1.6), arrowScale: setting("force-scale", 0.18),
     payloadOpacity: opacitySlider.valueAsNumber / 100,
   });
@@ -273,6 +285,11 @@ function load(replay, name) {
   byId("empty").hidden = true;
   byId("run-info").textContent = `${data.forceLimits.length} UAVs · ${data.time.length.toLocaleString()} samples`;
   byId("run-info").title = name;
+  const hasUavPositions = data.uav_positions !== undefined;
+  byId("cable-length-setting").hidden = hasUavPositions;
+  byId("uav-position-source").textContent = hasUavPositions
+    ? "This replay uses logged UAV positions."
+    : "UAV positions are estimated from logged force directions and the selected cable length.";
   byId("duration").textContent = `${data.time.at(-1).toFixed(2)} s`;
   timeline.max = data.time.length - 1;
   byId("playback").disabled = false;

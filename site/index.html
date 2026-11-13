@@ -81,9 +81,9 @@
           <label><input id="show-cables" type="checkbox" checked> Cables</label>
           <label><input id="show-labels" type="checkbox" checked> UAV labels</label>
         </div>
-        <label class="setting">Cable length <span><input id="cable-length" type="number" min="0.1" max="20" step="0.1" value="1.6"> m</span></label>
+        <label id="cable-length-setting" class="setting">Cable length <span><input id="cable-length" type="number" min="0.1" max="20" step="0.1" value="1.6"> m</span></label>
         <label class="setting">Arrow scale <span><input id="force-scale" type="number" min="0.01" max="2" step="0.01" value="0.18"> m/N</span></label>
-        <p>UAV positions are drawn along the logged force directions using the displayed cable length.</p>
+        <p id="uav-position-source"></p>
         <h2>Payload pose</h2>
         <dl id="pose"><div><dt>x</dt><dd id="pose-x">—</dd></div><div><dt>z</dt><dd id="pose-z">—</dd></div><div><dt>θ</dt><dd id="pose-theta">—</dd></div></dl>
       </aside>

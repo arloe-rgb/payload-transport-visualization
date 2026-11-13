@@ -45,6 +45,17 @@
         "samples": 2001,
         "replayVersion": 1
       }
+    },
+    {
+      "id": "uav-position-logging",
+      "name": "uav position logging test",
+      "file": "datasets/uav-position-logging.json",
+      "duration": 10.0,
+      "metadata": {
+        "uavs": 4,
+        "samples": 1001,
+        "replayVersion": 1
+      }
     }
   ],
   "default": "circular-baseline"

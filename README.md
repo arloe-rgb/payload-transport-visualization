@@ -3,9 +3,9 @@
 [Open the interactive viewer](https://arloe-rgb.github.io/payload-transport-visualization/).
 
 This static site replays completed runs of a planar collaborative payload
-transport simulation in 3D. UAV positions and cable lengths are illustrative.
-The browser reads recorded states, reference poses, forces and optimization
-diagnostics. Visitors need a WebGL 2 browser.
+transport simulation in 3D. The browser reads recorded states, reference poses,
+forces, UAV positions when available, and optimization diagnostics. Visitors
+need a WebGL 2 browser.
 
 ## Recorded runs
 
@@ -22,8 +22,16 @@ with one row per timestamp:
 | `time` | Simulation timestamps in seconds |
 | `state`, `reference` | `[x,z,theta,vx,vz,omega]` in SI units and radians |
 | `u` | `[Fx1,Fz1,Fx2,Fz2,...]` in N |
+| `uav_positions` | Optional world-frame UAV positions in m, as `[[x1,z1],[x2,z2],...]` in force order |
+| `attachment_positions` | Optional world-frame payload attachment positions in m, in the same format and order |
 | `lambda` | Optional equality multipliers in force-x, force-z, torque order |
 | `gradientU`, `gradientLambda` | Optional Lagrangian gradients in the corresponding variable order |
+
+The viewer interpolates logged positions between timestamps and draws each cable
+between its corresponding attachment and UAV. If attachment positions are
+omitted, the viewer transforms the body-frame attachments using the payload
+pose. Replays without UAV positions use force directions and the adjustable
+display cable length to estimate UAV positions.
 
 ## Deployment
 

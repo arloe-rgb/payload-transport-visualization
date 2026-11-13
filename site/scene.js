@@ -1,4 +1,4 @@
-// All positions here are display geometry in the replay's X-Z plane.
+// The replay's X-Z plane maps to Y = 0 in the scene.
 const PAYLOAD_DEPTH = 0.8; // m, visual only
 const MIN_DIRECTION_FORCE = 0.025; // N, visual only
 const UAV_COLORS = [0x008477, 0xc66b29, 0x616bc4, 0xb34e8a, 0x6f8b25, 0x197eac];
@@ -115,25 +115,28 @@ class ReplayScene {
       new ThreeReplay.LineBasicMaterial({color: 0xd98927, transparent: true, opacity: 0.7, depthWrite: false})));
     this.world.add(this.ghost);
 
-    this.drones = attachments.map(([x, z], i) => {
+    this.drones = attachments.map((_, i) => {
       const tint = UAV_COLORS[i % UAV_COLORS.length];
       const markerMaterial = new ThreeReplay.MeshBasicMaterial({color: tint, ...markerOptions});
-      const attachment = this.mesh(marker, markerMaterial, this.payload, x, 0, z);
+      const attachment = this.mesh(marker, markerMaterial, this.world);
       attachment.castShadow = false;
       attachment.renderOrder = 4;
-      return this.quadrotor(tint, i);
+      return {...this.quadrotor(tint, i), attachment};
     });
 
-    const lastDirection = attachments.map(() => Math.PI / 2);
-    // Store fallback directions so seeking backwards gives the same picture.
-    this.directions = replay.u.map((row) => lastDirection.map((angle, i) => {
-      const fx = row[2 * i], fz = row[2 * i + 1];
-      if (Math.hypot(fx, fz) <= MIN_DIRECTION_FORCE) return angle;
-      const raw = Math.atan2(fz, fx);
-      const delta = Math.atan2(Math.sin(raw - angle), Math.cos(raw - angle));
-      lastDirection[i] = angle + delta;
-      return lastDirection[i];
-    }));
+    this.directions = undefined;
+    if (!replay.uav_positions) {
+      const lastDirection = attachments.map(() => Math.PI / 2);
+      // Store fallback directions so seeking backwards gives the same picture.
+      this.directions = replay.u.map((row) => lastDirection.map((angle, i) => {
+        const fx = row[2 * i], fz = row[2 * i + 1];
+        if (Math.hypot(fx, fz) <= MIN_DIRECTION_FORCE) return angle;
+        const raw = Math.atan2(fz, fx);
+        const delta = Math.atan2(Math.sin(raw - angle), Math.cos(raw - angle));
+        lastDirection[i] = angle + delta;
+        return lastDirection[i];
+      }));
+    }
 
     const bounds = new ThreeReplay.Box3();
     const point = new ThreeReplay.Vector3();
@@ -144,7 +147,15 @@ class ReplayScene {
     for (const [x, z] of attachments) reach = Math.max(reach, Math.hypot(x, z));
     bounds.min.addScalar(-reach);
     bounds.max.addScalar(reach);
-    bounds.max.z += 2.3;
+    for (const history of [replay.attachment_positions, replay.uav_positions]) {
+      if (!history) continue;
+      const positionBounds = new ThreeReplay.Box3();
+      for (const row of history) {
+        for (const [x, z] of row) positionBounds.expandByPoint(point.set(x, 0, z));
+      }
+      bounds.union(positionBounds.expandByScalar(0.75));
+    }
+    if (!replay.uav_positions) bounds.max.z += 2.3;
     bounds.getCenter(this.center);
     this.span = Math.max(bounds.max.x - bounds.min.x, bounds.max.z - bounds.min.z, 4);
     this.makeEnvironment(bounds.min.z - 0.32);
@@ -317,7 +328,8 @@ class ReplayScene {
     this.render();
   }
 
-  update({pose, reference, forces, index, fraction, time, visible, cableLength, arrowScale, payloadOpacity}) {
+  update({pose, reference, forces, uavPositions, attachmentPositions, index, fraction, time,
+    visible, cableLength, arrowScale, payloadOpacity}) {
     const [x, z, theta] = pose;
     this.payload.position.set(x, 0, z);
     this.payload.rotation.y = -theta;
@@ -332,28 +344,33 @@ class ReplayScene {
 
     const cos = Math.cos(theta), sin = Math.sin(theta);
     const direction = this.scratch;
-    const next = Math.min(index + 1, this.directions.length - 1);
+    const next = Math.min(index + 1, this.replay.time.length - 1);
     this.replay.payload.attachments.forEach(([bx, bz], i) => {
-      const {model, props, label, cable, arrow} = this.drones[i];
-      const ax = x + cos * bx - sin * bz;
-      const az = z + sin * bx + cos * bz;
+      const {model, props, label, cable, arrow, attachment} = this.drones[i];
+      const [ax, az] = attachmentPositions?.[i] ?? [x + cos * bx - sin * bz, z + sin * bx + cos * bz];
+      attachment.position.set(ax, 0, az);
       const fx = forces[2 * i], fz = forces[2 * i + 1];
       const norm = Math.hypot(fx, fz);
-      const held = this.directions[index][i];
-      const fallback = held + fraction * (this.directions[next][i] - held);
-      let angle = fallback;
-      if (norm > MIN_DIRECTION_FORCE) {
-        const raw = Math.atan2(fz, fx);
-        const delta = Math.atan2(Math.sin(raw - fallback), Math.cos(raw - fallback));
-        const blend = Math.min(1, (norm - MIN_DIRECTION_FORCE) / MIN_DIRECTION_FORCE);
-        angle += blend * delta;
+      if (uavPositions) {
+        const [ux, uz] = uavPositions[i];
+        model.position.set(ux, 0, uz);
+      } else {
+        const held = this.directions[index][i];
+        const fallback = held + fraction * (this.directions[next][i] - held);
+        let angle = fallback;
+        if (norm > MIN_DIRECTION_FORCE) {
+          const raw = Math.atan2(fz, fx);
+          const delta = Math.atan2(Math.sin(raw - fallback), Math.cos(raw - fallback));
+          const blend = Math.min(1, (norm - MIN_DIRECTION_FORCE) / MIN_DIRECTION_FORCE);
+          angle += blend * delta;
+        }
+        model.position.set(ax + cableLength * Math.cos(angle), 0, az + cableLength * Math.sin(angle));
       }
-      model.position.set(ax + cableLength * Math.cos(angle), 0, az + cableLength * Math.sin(angle));
       label.visible = visible.labels;
       props.forEach((prop, j) => { prop.rotation.z = (j % 2 ? -1 : 1) * time * 38 + j; });
       const points = cable.geometry.attributes.position;
       points.setXYZ(0, ax, 0, az);
-      points.setXYZ(1, model.position.x, 0, model.position.z - 0.15);
+      points.setXYZ(1, model.position.x, 0, model.position.z - (uavPositions ? 0 : 0.15));
       points.needsUpdate = true;
       cable.visible = visible.cables;
       arrow.visible = visible.forces && norm > 1e-8;

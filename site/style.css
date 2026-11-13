@@ -51,6 +51,7 @@ input { accent-color: var(--accent); }
 .opacity-setting output { color: var(--muted); font: 12px var(--mono); }
 .opacity-setting input { grid-column: 1 / -1; width: 100%; margin: 0; }
 .setting { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 10px; font-size: 12px; }
+.setting[hidden] { display: none; }
 .setting input { width: 68px; font-family: var(--mono); }
 .layers p { font-size: 12px; line-height: 1.5; color: var(--muted); margin: 15px 0; padding-bottom: 15px; border-bottom: 1px solid var(--line); }
 dl { margin: 10px 0 0; font: 13px var(--mono); }
