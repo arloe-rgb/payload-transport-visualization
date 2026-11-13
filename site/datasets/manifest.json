@@ -2,61 +2,16 @@
   "version": 1,
   "datasets": [
     {
-      "id": "circular-baseline",
-      "name": "Circular tracking baseline",
-      "file": "datasets/circular-baseline.json",
-      "duration": 20.0,
+      "id": "circ-traj-sin-orient",
+      "name": "circircular position sinusoidal orientation trajectory",
+      "file": "datasets/circ-traj-sin-orient.json",
+      "duration": 15.0,
       "metadata": {
         "uavs": 4,
-        "samples": 2001,
-        "replayVersion": 1
-      },
-      "description": "20-second planar tracking run with four UAVs and 10 ms samples."
-    },
-    {
-      "id": "sinusoidal-trial",
-      "name": "Sinusoidal Tracking",
-      "file": "datasets/sinusoidal-trial.json",
-      "duration": 20.0,
-      "metadata": {
-        "uavs": 4,
-        "samples": 2001,
-        "replayVersion": 1
-      }
-    },
-    {
-      "id": "sinusoidal-amp-2",
-      "name": "Sinusoidal Amplitude 2",
-      "file": "datasets/sinusoidal-amp-2.json",
-      "duration": 20.0,
-      "metadata": {
-        "uavs": 4,
-        "samples": 2001,
-        "replayVersion": 1
-      }
-    },
-    {
-      "id": "sin-orient",
-      "name": "sinusoidal orientation",
-      "file": "datasets/sin-orient.json",
-      "duration": 20.0,
-      "metadata": {
-        "uavs": 4,
-        "samples": 2001,
-        "replayVersion": 1
-      }
-    },
-    {
-      "id": "uav-position-logging",
-      "name": "uav position logging test",
-      "file": "datasets/uav-position-logging.json",
-      "duration": 10.0,
-      "metadata": {
-        "uavs": 4,
-        "samples": 1001,
+        "samples": 1501,
         "replayVersion": 1
       }
     }
   ],
-  "default": "circular-baseline"
+  "default": "circ-traj-sin-orient"
 }
